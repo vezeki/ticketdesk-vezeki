@@ -1,0 +1,147 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  TECNICO
+  USUARIO
+}
+
+enum TicketStatus {
+  ABERTO
+  EM_ANDAMENTO
+  AGUARDANDO
+  RESOLVIDO
+  CANCELADO
+}
+
+enum Priority {
+  BAIXA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+enum SlaLevel {
+  ATE_120H
+  ATE_72H
+  ATE_48H
+  ATE_24H
+  ATE_8H
+  ATE_4H
+}
+
+enum TechnicianKey {
+  KAIQUE_OLIVEIRA
+  FERNANDO_FERNANDES
+  RODRIGO_CARMO
+  ALEXANDRE
+}
+
+model User {
+  id         String   @id @default(uuid())
+  name       String
+  email      String   @unique
+  password   String
+  role       Role     @default(USUARIO)
+  department String?
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  ticketsAbertos    Ticket[]        @relation("requester")
+  ticketsAtribuidos Ticket[]        @relation("assignee")
+  comments          Comment[]
+  passwordResets    PasswordReset[]
+}
+
+model Ticket {
+  id              String       @id @default(uuid())
+  title           String
+  description     String       @db.Text
+  status          TicketStatus @default(ABERTO)
+  priority        Priority     @default(MEDIA)
+  slaLevel        SlaLevel     @default(ATE_48H)
+  category        String       @default("Outros")
+  requesterId     String
+  requesterEmail  String?
+  managerName     String?
+  managerEmail    String?
+  establishment   String?
+  occurrenceType  String?
+  technicianKey   TechnicianKey?
+  assignedToId    String?
+  resolvedAt      DateTime?
+  resolutionNote  String?      @db.Text
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  requester   User               @relation("requester", fields: [requesterId], references: [id])
+  assignedTo  User?              @relation("assignee", fields: [assignedToId], references: [id])
+  comments    Comment[]
+  history     TicketHistory[]
+  attachments TicketAttachment[]
+
+  @@index([requesterId])
+  @@index([assignedToId])
+  @@index([status])
+  @@index([slaLevel])
+}
+
+model Comment {
+  id         String   @id @default(uuid())
+  ticketId   String
+  userId     String
+  message    String   @db.Text
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([ticketId])
+}
+
+model TicketHistory {
+  id        String   @id @default(uuid())
+  ticketId  String
+  field     String
+  oldValue  String?  @db.Text
+  newValue  String   @db.Text
+  changedAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+model TicketAttachment {
+  id           String   @id @default(uuid())
+  ticketId     String
+  fileName     String
+  originalName String
+  mimeType     String
+  size         Int
+  createdAt    DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+model PasswordReset {
+  id        String    @id @default(uuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
